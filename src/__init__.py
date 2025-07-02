@@ -27,6 +27,10 @@ try:
     # Import pipeline and utilities
     from .feature_engineering_pipeline import FeatureEngineeringPipeline, create_feature_engineering_pipeline
     
+    # Import RFM and proxy target modules
+    from .rfm_analyzer import RFMAnalyzer
+    from .proxy_target_creator import ProxyTargetCreator
+    
     # Import configuration
     from .config import *
 except ImportError:
@@ -40,6 +44,10 @@ except ImportError:
     
     # Import pipeline and utilities
     from feature_engineering_pipeline import FeatureEngineeringPipeline, create_feature_engineering_pipeline
+    
+    # Import RFM and proxy target modules
+    from rfm_analyzer import RFMAnalyzer
+    from proxy_target_creator import ProxyTargetCreator
     
     # Import configuration
     from config import *
@@ -63,6 +71,11 @@ __all__ = [
     'FeatureEngineeringPipeline',
     'create_feature_engineering_pipeline',
     
+    # RFM and Proxy Target modules
+    'RFMAnalyzer',
+    'ProxyTargetCreator',
+    'create_proxy_target_variable',
+    
     # Configuration
     'TARGET_COLUMN',
     'RANDOM_SEED',
@@ -78,7 +91,9 @@ def get_available_transformers():
         'CategoricalEncoderTransformer': 'Encodes categorical variables with multiple strategies',
         'WOEIVTransformer': 'Applies Weight of Evidence transformations for credit scoring',
         'MissingValuesTransformer': 'Handles missing values with various imputation methods',
-        'FeatureScalerTransformer': 'Scales numerical features using different scaling methods'
+        'FeatureScalerTransformer': 'Scales numerical features using different scaling methods',
+        'RFMAnalyzer': 'Calculates Recency, Frequency, Monetary metrics for customer analysis',
+        'ProxyTargetCreator': 'Creates proxy target variables using RFM-based clustering'
     }
 
 def get_pipeline_info():
@@ -161,3 +176,62 @@ df_with_woe = woe_transformer.fit_transform(df)
     print("  • Comprehensive data preprocessing")
     print("  • Modular and extensible design")
     print("=" * 60)
+
+# Task 4 - Proxy Target Variable Creation Workflow
+def create_proxy_target_variable(df, customer_id_col='CustomerId', date_col='TransactionStartTime', 
+                                amount_col='Amount', n_clusters=3, random_state=42):
+    """
+    Complete workflow for creating proxy target variables using RFM analysis and clustering
+    
+    Parameters:
+    -----------
+    df : DataFrame
+        Transaction data
+    customer_id_col : str
+        Customer identifier column
+    date_col : str
+        Transaction date column
+    amount_col : str
+        Transaction amount column
+    n_clusters : int
+        Number of clusters for K-Means
+    random_state : int
+        Random state for reproducibility
+        
+    Returns:
+    --------
+    tuple: (data_with_target, rfm_analyzer, proxy_creator, cluster_summary)
+    """
+    print("🎯 Starting Proxy Target Variable Creation Workflow...")
+    print("=" * 60)
+    
+    # Step 1: RFM Analysis
+    print("Step 1: Calculating RFM metrics...")
+    rfm_analyzer = RFMAnalyzer(customer_id_col=customer_id_col, 
+                               date_col=date_col, 
+                               amount_col=amount_col)
+    rfm_analyzer.fit(df)
+    
+    # Step 2: Get scaled RFM features for clustering
+    print("\nStep 2: Preparing features for clustering...")
+    rfm_scaled = rfm_analyzer.get_scaled_rfm_features()
+    
+    # Step 3: Create proxy target using clustering
+    print("\nStep 3: Performing customer clustering...")
+    proxy_creator = ProxyTargetCreator(n_clusters=n_clusters, 
+                                       random_state=random_state,
+                                       customer_id_col=customer_id_col)
+    proxy_creator.fit(rfm_scaled, rfm_analyzer.rfm_data)
+    
+    # Step 4: Apply target variable to original data
+    print("\nStep 4: Creating proxy target variable...")
+    data_with_target = proxy_creator.transform(df)
+    
+    # Step 5: Get summary
+    cluster_summary = proxy_creator.get_cluster_summary()
+    
+    print("\n✅ Proxy Target Variable Creation Completed!")
+    print(f"   High-risk customers: {cluster_summary['high_risk_count']} ({cluster_summary['high_risk_percentage']:.1f}%)")
+    print("=" * 60)
+    
+    return data_with_target, rfm_analyzer, proxy_creator, cluster_summary
